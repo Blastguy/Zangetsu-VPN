@@ -51,22 +51,34 @@ class ZangetsuServerProtocol(ZangetsuProtocol):
     def __init__(self, *args, **kwargs):
         super().__init__(False, *args, **kwargs)
 
-async def run(
+async def server(
+    host: str,
+    port: int,
+    configuration: QuicConfiguration,
+) -> None:
+    await serve(
+        host,
+        port,
+        configuration=configuration,
+        create_protocol=ZangetsuServerProtocol,
+    )
+    await asyncio.Future()
+async def client(
     configuration: QuicConfiguration,
     host: str,
     port: int,
     # query_type: str,
     # dns_query: str,
 ) -> None:
-    logger.debug(f"Connecting to {host}:{port}")
+    logger.info(f"Connecting to {host}:{port}")
     async with connect(
         host,
         port,
         configuration=configuration,
         create_protocol=ZangetsuClientProtocol
-        ) as client:
+        ):
         logger.info("Connected")
-        await asyncio.shield(asyncio.get_event_loop().create_future())
+        await asyncio.Future()
 
 
 if __name__ == "__main__":
@@ -129,25 +141,18 @@ if __name__ == "__main__":
     if args.server:
 
         configuration.load_cert_chain(args.certificate, args.private_key)
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(
-            serve(
+        asyncio.run(
+            server(
                 args.host,
                 args.port,
                 configuration=configuration,
-                create_protocol=ZangetsuServerProtocol,
             )
         )
-        loop.run_forever() #//figure out why this is needed, to reconnect? if so not needed, if server terminates with client, fine with us.
     if not args.server:
         if args.insecure:
             configuration.verify_mode = ssl.CERT_NONE
-
-        loop = asyncio.get_event_loop()
-        loop.run_until_complete(
-            run(
+        asyncio.run(client(
                 configuration=configuration,
                 host=args.host,
                 port=args.port,
-            )
-        )
+            ))
