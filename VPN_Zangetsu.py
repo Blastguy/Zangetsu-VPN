@@ -11,7 +11,7 @@ from aioquic.asyncio.client import connect
 from aioquic.asyncio import QuicConnectionProtocol, serve
 from aioquic.quic.configuration import QuicConfiguration
 from aioquic.quic.events import StreamDataReceived
-from aioquic.quic.logger import QuicLogger
+
 logger = logging.getLogger("Zangetsu")
 
 class ZangetsuProtocol(QuicConnectionProtocol):
@@ -19,7 +19,6 @@ class ZangetsuProtocol(QuicConnectionProtocol):
         super().__init__(*args, **kwargs)
         self._is_client = is_client
         self.stream_id = self._quic.get_next_available_stream_id() if is_client else None
-        self.tun = TunTapDevice
         tun = TunTapDevice(name="tunnel" + ("_client" if is_client else "_server"), flags=pytun.IFF_TUN | pytun.IFF_NO_PI)
         tun.addr = "10.11.12.1" if is_client else "10.11.12.2"
         tun.dstaddr = "10.11.12.2" if is_client else "10.11.12.1"
@@ -40,8 +39,17 @@ class ZangetsuProtocol(QuicConnectionProtocol):
 
     def quic_event_received(self, event):
         if isinstance(event, StreamDataReceived):
-            self._tun.write(event.data)
+            if not self.stream_id:
+                self.stream_id = event.stream_id
+            self._tun.write(bytes(event.data))
 
+class ZangetsuClientProtocol(ZangetsuProtocol):
+    def __init__(self, *args, **kwargs):
+        super().__init__(True, *args, **kwargs)
+
+class ZangetsuServerProtocol(ZangetsuProtocol):
+    def __init__(self, *args, **kwargs):
+        super().__init__(False, *args, **kwargs)
 
 async def run(
     configuration: QuicConfiguration,
@@ -51,12 +59,15 @@ async def run(
     # dns_query: str,
 ) -> None:
     logger.debug(f"Connecting to {host}:{port}")
-    await connect(
+    async with connect(
         host,
         port,
         configuration=configuration,
-        create_protocol=ZangetsuProtocol,
-        )
+        create_protocol=ZangetsuClientProtocol
+        ) as client:
+        logger.info("Connected")
+        await asyncio.shield(asyncio.get_event_loop().create_future())
+
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="VPN over QUIC")
@@ -113,7 +124,7 @@ if __name__ == "__main__":
         level=logging.DEBUG if args.verbose else logging.INFO,
     )
     configuration = QuicConfiguration(
-        alpn_protocols=["doq"], is_client=False if args.server is None else True, max_datagram_frame_size=65536
+        alpn_protocols=["doq"], is_client=False if args.server else True, max_datagram_frame_size=65536
     )
     if args.server:
 
@@ -124,15 +135,13 @@ if __name__ == "__main__":
                 args.host,
                 args.port,
                 configuration=configuration,
-                create_protocol=ZangetsuProtocol,
+                create_protocol=ZangetsuServerProtocol,
             )
         )
-        # loop.run_forever() //figure out why this is needed, to reconnect? if so not needed, if server terminates with client, fine with us.
-    if args.client:
+        loop.run_forever() #//figure out why this is needed, to reconnect? if so not needed, if server terminates with client, fine with us.
+    if not args.server:
         if args.insecure:
             configuration.verify_mode = ssl.CERT_NONE
-        if args.quic_log:
-            configuration.quic_logger = QuicLogger()
 
         loop = asyncio.get_event_loop()
         loop.run_until_complete(
