@@ -4,6 +4,7 @@ import logging
 import ssl
 import threading
 import pytun
+import subprocess
 
 from pytun import TunTapDevice
 
@@ -139,7 +140,13 @@ if __name__ == "__main__":
         alpn_protocols=["doq"], is_client=False if args.server else True, max_datagram_frame_size=65536
     )
     if args.server:
-
+        serverPath = './server_setup.sh'
+        try:
+            subprocess.run(['chmod', '+x', serverPath], check=True)
+            subprocess.run(['bash', serverPath], check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"Error executing Server script: {e}")
+        
         configuration.load_cert_chain(args.certificate, args.private_key)
         asyncio.run(
             server(
@@ -149,6 +156,13 @@ if __name__ == "__main__":
             )
         )
     if not args.server:
+        clientPath = './client_setup.sh'
+        try:
+            subprocess.run(['chmod', '+x', clientPath], check=True)
+            subprocess.run(['bash', clientPath], check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"Error executing Client script: {e}")
+        
         if args.insecure:
             configuration.verify_mode = ssl.CERT_NONE
         asyncio.run(client(
