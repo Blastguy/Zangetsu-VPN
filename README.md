@@ -5,12 +5,12 @@ Georgia Institute of Technology
 
 Command to run the Server counterpart:
 ```
-sudo python3 VPN_Zangetsu.py --server --port 3001 -key private.key -c pub.pem
+sudo python3 VPN_Zangetsu.py --server --port 3001 -k private.key -c pub.pem
 ```
 
 Command to run the Client counterpart:
 ```
-sudo python3 VPN_Zangetsu.py --client --host [Host IP] ---port 3001 -i
+sudo python3 VPN_Zangetsu.py --host [Host IP] --port 3001 -i
 ```
 
 Extra Commands:
