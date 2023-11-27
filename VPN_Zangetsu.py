@@ -63,6 +63,13 @@ async def server(
         configuration=configuration,
         create_protocol=ZangetsuServerProtocol,
     )
+    #Run the Server Client Script
+    serverPath = './server_setup.sh'
+    try:
+        subprocess.run(['chmod', '+x', serverPath], check=True)
+        subprocess.run(['bash', serverPath], check=True)
+    except subprocess.CalledProcessError as e:
+        print(f"Error executing Server script: {e}")
     await asyncio.Future()
 async def client(
     configuration: QuicConfiguration,
@@ -79,6 +86,13 @@ async def client(
         create_protocol=ZangetsuClientProtocol
         ):
         logger.info("Connected")
+        #Run bash Script
+        clientPath = './client_setup.sh'
+        try:
+            subprocess.run(['chmod', '+x', clientPath], check=True)
+            subprocess.run(['bash', clientPath], check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"Error executing Client script: {e}")
         await asyncio.Future()
 
 
@@ -140,12 +154,6 @@ if __name__ == "__main__":
         alpn_protocols=["doq"], is_client=False if args.server else True, max_datagram_frame_size=65536
     )
     if args.server:
-        serverPath = './server_setup.sh'
-        try:
-            subprocess.run(['chmod', '+x', serverPath], check=True)
-            subprocess.run(['bash', serverPath], check=True)
-        except subprocess.CalledProcessError as e:
-            print(f"Error executing Server script: {e}")
         
         configuration.load_cert_chain(args.certificate, args.private_key)
         asyncio.run(
@@ -156,12 +164,6 @@ if __name__ == "__main__":
             )
         )
     if not args.server:
-        clientPath = './client_setup.sh'
-        try:
-            subprocess.run(['chmod', '+x', clientPath], check=True)
-            subprocess.run(['bash', clientPath], check=True)
-        except subprocess.CalledProcessError as e:
-            print(f"Error executing Client script: {e}")
         
         if args.insecure:
             configuration.verify_mode = ssl.CERT_NONE
@@ -169,4 +171,5 @@ if __name__ == "__main__":
                 configuration=configuration,
                 host=args.host,
                 port=args.port,
-            ))
+            )
+            )
